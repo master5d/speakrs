@@ -141,6 +141,7 @@ pub struct EmbeddingModel {
     #[cfg(feature = "coreml")]
     coreml: CoreMlEmbeddingState,
     buffers: EmbeddingBuffers,
+    pub progress: Option<crate::inference::segmentation::ProgressSink>,
 }
 
 impl EmbeddingModel {

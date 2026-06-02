@@ -64,6 +64,7 @@ impl DecodedSegmentations {
         layout: &ChunkLayout,
         embeddings: &mut Array3<f32>,
     ) -> Result<(), PipelineError> {
+        let total = self.0.shape()[0].max(1) as f32;
         for chunk_idx in 0..self.0.shape()[0] {
             let chunk_audio = layout.chunk_audio(audio, chunk_idx);
             let chunk_segmentations = self.0.slice(s![chunk_idx, .., ..]);
@@ -73,6 +74,10 @@ impl DecodedSegmentations {
             embeddings
                 .slice_mut(s![chunk_idx, .., ..])
                 .assign(&chunk_embeddings);
+
+            if let Some(cb) = emb_model.progress.as_mut() {
+                cb(((chunk_idx + 1) as f32 / total).min(1.0));
+            }
         }
 
         Ok(())
@@ -87,8 +92,10 @@ impl DecodedSegmentations {
     ) -> Result<(), PipelineError> {
         let mut storage = Array3Writer(embeddings);
         let mut pending = Vec::with_capacity(emb_model.primary_batch_size());
+        let num_chunks = self.0.shape()[0];
+        let total = num_chunks.max(1) as f32;
 
-        for chunk_idx in 0..self.0.shape()[0] {
+        for chunk_idx in 0..num_chunks {
             let chunk_audio = layout.chunk_audio(audio, chunk_idx);
             let chunk_segmentations = self.0.slice(s![chunk_idx, .., ..]);
             let clean_masks = clean_masks(&chunk_segmentations);
@@ -111,6 +118,10 @@ impl DecodedSegmentations {
                     flush_masked(emb_model, &pending, &mut storage)?;
                     pending.clear();
                 }
+            }
+
+            if let Some(cb) = emb_model.progress.as_mut() {
+                cb(((chunk_idx + 1) as f32 / total).min(1.0));
             }
         }
 

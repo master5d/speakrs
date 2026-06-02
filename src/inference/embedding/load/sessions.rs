@@ -373,6 +373,7 @@ impl LoadedSessions {
                 )),
                 split_primary_weights_batch_buffer: Array2::zeros((PRIMARY_BATCH_SIZE, 589)),
             },
+            progress: None,
         })
     }
 }
