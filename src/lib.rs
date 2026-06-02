@@ -222,6 +222,7 @@ pub(crate) mod utils;
 
 // crate-root re-exports for the main import path
 pub use inference::ExecutionMode;
+pub use inference::segmentation::ProgressSink;
 pub use models::ModelBundle;
 #[cfg(feature = "online")]
 pub use models::ModelManager;

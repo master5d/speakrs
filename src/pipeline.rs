@@ -48,6 +48,7 @@ use std::path::Path;
 use ndarray::{Array2, Array3};
 use tracing::{debug, trace};
 
+use crate::ProgressSink;
 use crate::clustering::plda::PldaTransform;
 use crate::inference::ExecutionMode;
 use crate::inference::embedding::EmbeddingModel;
@@ -81,6 +82,32 @@ macro_rules! pipeline_run_methods {
             config: &PipelineConfig,
         ) -> Result<DiarizationResult, PipelineError> {
             self.runner().run(audio, file_id, config)
+        }
+
+        /// Diarize with a global progress callback (0.0..=1.0): segmentation maps to
+        /// 0.0–0.45, embedding to 0.45–0.90; the clustering tail jumps to 1.0 at the end.
+        pub fn run_with_progress(
+            &mut self,
+            audio: &[f32],
+            on_progress: impl FnMut(f32) + Send + 'static,
+        ) -> Result<DiarizationResult, PipelineError> {
+            let config = self.pipeline_config();
+            let shared = std::sync::Arc::new(std::sync::Mutex::new(on_progress));
+            let seg_sink = {
+                let s = shared.clone();
+                Box::new(move |f: f32| (s.lock().unwrap())(f * 0.45)) as ProgressSink
+            };
+            let emb_sink = {
+                let s = shared.clone();
+                Box::new(move |f: f32| (s.lock().unwrap())(0.45 + f * 0.45)) as ProgressSink
+            };
+            self.seg_model.progress = Some(seg_sink);
+            self.emb_model.progress = Some(emb_sink);
+            let result = self.run_with_config(audio, "file1", &config);
+            self.seg_model.progress = None;
+            self.emb_model.progress = None;
+            (shared.lock().unwrap())(1.0);
+            result
         }
 
         /// Run only inference (segmentation + embedding), returning intermediate artifacts
