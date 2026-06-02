@@ -108,14 +108,18 @@ impl SegmentationModel {
                     .map_err(|error| ort::Error::new(error.to_string()))?;
                 results.extend(self.run_batch(&batch)?);
                 next_idx += PRIMARY_BATCH_SIZE;
-                continue;
+            } else {
+                let window = windows
+                    .window(next_idx, "segmentation run tail window")
+                    .map_err(|error| ort::Error::new(error.to_string()))?;
+                results.push(self.run_window(window)?);
+                next_idx += 1;
             }
 
-            let window = windows
-                .window(next_idx, "segmentation run tail window")
-                .map_err(|error| ort::Error::new(error.to_string()))?;
-            results.push(self.run_window(window)?);
-            next_idx += 1;
+            if let Some(cb) = self.progress.as_mut() {
+                let frac = (next_idx as f32 / total_windows.max(1) as f32).min(1.0);
+                cb(frac);
+            }
         }
 
         Ok(results)

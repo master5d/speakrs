@@ -43,6 +43,9 @@ const PRIMARY_BATCH_SIZE: usize = 32;
 #[cfg(feature = "coreml")]
 const LARGE_BATCH_SIZE: usize = 64;
 
+/// Progress callback reporting a local fraction (0.0..=1.0) for this stage.
+pub type ProgressSink = Box<dyn FnMut(f32) + Send>;
+
 /// Sliding-window segmentation model (pyannote segmentation-3.0)
 pub struct SegmentationModel {
     model_path: PathBuf,
@@ -64,6 +67,7 @@ pub struct SegmentationModel {
     window_samples: usize,
     step_samples: usize,
     sample_rate: usize,
+    pub progress: Option<ProgressSink>,
 }
 
 // SAFETY: SegmentationModel is only used from one thread at a time via &mut self
@@ -204,6 +208,7 @@ impl SegmentationModel {
             window_samples,
             step_samples,
             sample_rate,
+            progress: None,
         })
     }
 
